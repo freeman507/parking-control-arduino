@@ -12,9 +12,9 @@
 Ultrasonic ultrasonic(pino_trigger, pino_echo);
 
 byte mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
-IPAddress ip(10, 0, 0, 200);
+IPAddress ip(172, 20, 16, 245);
 
-IPAddress server(10, 0, 0, 111);
+IPAddress server(172, 20, 16, 232);
 
 EthernetClient client;
 MFRC522 mfrc522(SS_PIN, RST_PIN); // Create MFRC522 instance.
@@ -52,25 +52,35 @@ void setup()
     }
 }
 
+String conteudo;
+
 bool verificaBotton()
 {
-    return mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial();
+   boolean ocupado = mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial();
+   conteudo = ""; 
+   if (ocupado) {
+     byte letra;
+     for (byte i = 0; i < mfrc522.uid.size; i++) 
+     {
+       //Serial.print(mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " ");
+       //Serial.print(mfrc522.uid.uidByte[i], HEX);
+       conteudo.concat(String(mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " "));
+       conteudo.concat(String(mfrc522.uid.uidByte[i], HEX));
+     }
+   }
+   return ocupado;
 }
 
 boolean verificaVaga()
 {
     //Le as informacoes do sensor, em cm e pol
-    float cmMsec, inMsec;
+    float cmMsec;
     long microsec = ultrasonic.timing();
     cmMsec = ultrasonic.convert(microsec, Ultrasonic::CM);
-    inMsec = ultrasonic.convert(microsec, Ultrasonic::IN);
     //Exibe informacoes no serial monitor
     Serial.print("Distancia em cm: ");
-    Serial.print(cmMsec);
-    Serial.print(" - Distancia em polegadas: ");
-    Serial.println(inMsec);
-    delay(1000);
-    return cmMsec < 5;
+    Serial.println(cmMsec);
+    return cmMsec < 8 && cmMsec > 1;
 }
 
 int count = 0;
@@ -84,7 +94,7 @@ void imprime_status_vaga()
 
 void loop()
 {
-    bool ocupado = verificaVaga();
+    bool ocupado = verificaVaga() || verificaBotton();
 
     if (ocupado)
     {
@@ -101,8 +111,14 @@ void loop()
         imprime_status_vaga();
         if ((status_vaga[0] + status_vaga[1]) > 0)
         {
-            Serial.println("ocupado");
-            client.print("1");
+            String msg = "";
+            if (conteudo.length() > 0) { 
+               msg = "1 - " + conteudo;
+            } else {
+               msg = "1";
+            }
+            Serial.println(msg);
+            client.print(msg);
         }
         else
         {
